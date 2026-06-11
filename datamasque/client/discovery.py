@@ -34,12 +34,20 @@ logger = logging.getLogger(__name__)
 class DiscoveryClient(BaseClient):
     """Schema-discovery and ruleset-generation API methods. Mixed into `DataMasqueClient`."""
 
-    def start_async_ruleset_generation(self, connection_id: ConnectionId, selected_data: SelectedData) -> None:
+    def start_async_ruleset_generation(
+        self,
+        connection_id: ConnectionId,
+        selected_data: SelectedData,
+        locality: Optional[str] = None,
+    ) -> None:
         """
         Starts async ruleset generation using the most recent discovery results on the given connection.
 
         If the connection is a database connection, `selected_data` should be of type `SelectedColumns`.
         If the connection is a file connection, `selected_data` should be of type `SelectedFileData`.
+
+        `locality` optionally pins the locality used for this generation,
+        overriding the server-wide locality setting.
 
         Generation runs asynchronously on the server.
         Poll `get_async_ruleset_generation_task_status` until it returns
@@ -72,6 +80,9 @@ class DiscoveryClient(BaseClient):
                 f"expected `SelectedColumns` or `SelectedFileData`, got {type(selected_data)}."
             )
 
+        if locality is not None:
+            data["locality"] = locality
+
         self.make_request(method="POST", path=f"/api/async-generate-ruleset/{connection_id}/", data=data)
 
     def start_async_ruleset_generation_from_csv(
@@ -79,11 +90,15 @@ class DiscoveryClient(BaseClient):
         connection_id: ConnectionId,
         csv_content: Union[str, bytes, TextIOBase, BufferedIOBase],
         target_size_bytes: Optional[int] = None,
+        locality: Optional[str] = None,
     ) -> None:
         """
         Generate ruleset(s) from the schema discovery CSV file obtained from `get_db_discovery_result_report()`.
 
         `target_size_bytes` is an optional integer specifying the approximate size in bytes of each generated ruleset.
+
+        `locality` optionally pins the locality used for this generation,
+        overriding the server-wide locality setting.
 
         `csv_content` can be:
         - A string (e.g. from `get_db_discovery_result_report()`)
@@ -115,10 +130,15 @@ class DiscoveryClient(BaseClient):
                 content_type="text/csv",
             ),
         ]
+        data: dict = {}
+        if target_size_bytes is not None:
+            data["target_size_bytes"] = target_size_bytes
+        if locality is not None:
+            data["locality"] = locality
         self.make_request(
             method="POST",
             path=f"/api/async-generate-ruleset/{connection_id}/from-csv/",
-            data={"target_size_bytes": target_size_bytes} if target_size_bytes is not None else None,
+            data=data or None,
             files=files,
         )
 

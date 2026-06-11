@@ -5,6 +5,7 @@ History
 1.0.5 (unreleased)
 ------------------
 
+* Added an optional ``locality`` parameter to ruleset-generation calls (``RulesetGenerationRequest``, ``FileRulesetGenerationRequest``, ``start_async_ruleset_generation`` and ``start_async_ruleset_generation_from_csv``) to pin the locality for a single generation, overriding the server-wide setting.
 * Fixed a ``401`` when paginating behind a TLS-terminating proxy: ``next`` links are now reduced to path+query and re-anchored to the configured ``base_url`` instead of being followed verbatim, so the ``Authorization`` header is no longer stripped when the server-reported scheme, host, or port differs.
 
 1.0.4 (2026-06-09)

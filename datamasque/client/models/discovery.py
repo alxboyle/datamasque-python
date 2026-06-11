@@ -63,6 +63,8 @@ class RulesetGenerationRequest(BaseModel):
     `selected_columns` is the same nested `schema -> table -> [column, ...]` mapping
     used by `SelectedColumns.columns`,
     and `hash_columns` follows the `HashColumnsTableConfig` shape.
+    `locality` optionally pins the locality used for this generation,
+    overriding the server-wide locality setting.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -70,6 +72,7 @@ class RulesetGenerationRequest(BaseModel):
     connection: Union[ConnectionId, ConnectionConfig]
     selected_columns: dict[str, dict[str, list[str]]]
     hash_columns: Optional[dict[str, dict[str, HashColumnsTableConfig]]] = None
+    locality: Optional[str] = None
 
     @field_validator("connection", mode="before")
     @classmethod
@@ -82,12 +85,15 @@ class FileRulesetGenerationRequest(BaseModel):
     Request body for `POST /api/generate-file-ruleset/`.
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `locality` optionally pins the locality used for this generation,
+    overriding the server-wide locality setting.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
     selected_data: list[UserSelection]
+    locality: Optional[str] = None
 
     @field_validator("connection", mode="before")
     @classmethod

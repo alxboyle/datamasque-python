@@ -597,6 +597,84 @@ def test_ruleset_generation_request_omits_optional_hash_columns(client):
     assert "hash_columns" not in m.last_request.json()
 
 
+def test_ruleset_generation_request_includes_locality_in_payload(client):
+    req = RulesetGenerationRequest(
+        connection="conn-1",
+        selected_columns={"public": {"users": ["email"]}},
+        locality="BR",
+    )
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-ruleset/v2/",
+            content=b"yaml",
+            status_code=201,
+        )
+        client.generate_ruleset(req)
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "selected_columns": {"public": {"users": ["email"]}},
+        "locality": "BR",
+    }
+
+
+def test_ruleset_generation_request_omits_locality_when_not_provided(client):
+    req = RulesetGenerationRequest(
+        connection="conn-1",
+        selected_columns={"public": {"users": ["email"]}},
+    )
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-ruleset/v2/",
+            content=b"yaml",
+            status_code=201,
+        )
+        client.generate_ruleset(req)
+
+    assert "locality" not in m.last_request.json()
+
+
+def test_start_async_ruleset_generation_includes_locality_in_payload(client):
+    connection_id = ConnectionId("1")
+    selected_columns = SelectedColumns(columns={"public": {"users": ["col1"]}})
+
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server/api/async-generate-ruleset/{connection_id}/", status_code=201)
+        client.start_async_ruleset_generation(connection_id, selected_columns, locality="IN")
+
+        request_data = m.last_request.json()
+        assert request_data["locality"] == "IN"
+        assert request_data["selected_columns"] == {"public": {"users": ["col1"]}}
+
+
+def test_start_async_ruleset_generation_omits_locality_when_not_provided(client):
+    connection_id = ConnectionId("1")
+    selected_columns = SelectedColumns(columns={"public": {"users": ["col1"]}})
+
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server/api/async-generate-ruleset/{connection_id}/", status_code=201)
+        client.start_async_ruleset_generation(connection_id, selected_columns)
+
+        assert "locality" not in m.last_request.json()
+
+
+def test_start_async_ruleset_generation_from_csv_includes_locality_in_payload(client):
+    connection_id = ConnectionId("1")
+    csv_content = "schema,table,column,selected\npublic,users,email,true"
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/from-csv/",
+            status_code=201,
+        )
+        client.start_async_ruleset_generation_from_csv(connection_id, csv_content, locality="US")
+
+        form_data = parse_multipart_form(m.last_request)
+        assert form_data["locality"] == "US"
+
+
 def test_file_ruleset_generation_request_round_trip(client):
     req = FileRulesetGenerationRequest(
         connection="conn-1",
@@ -616,6 +694,45 @@ def test_file_ruleset_generation_request_round_trip(client):
         "connection": "conn-1",
         "selected_data": [{"locators": [["a"]], "files": ["f1.csv"]}],
     }
+
+
+def test_file_ruleset_generation_request_includes_locality_in_payload(client):
+    req = FileRulesetGenerationRequest(
+        connection="conn-1",
+        selected_data=[{"locators": [["a"]], "files": ["f1.csv"]}],
+        locality="BR",
+    )
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-file-ruleset/",
+            content=b"yaml",
+            status_code=201,
+        )
+        client.generate_file_ruleset(req)
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "selected_data": [{"locators": [["a"]], "files": ["f1.csv"]}],
+        "locality": "BR",
+    }
+
+
+def test_file_ruleset_generation_request_omits_locality_when_not_provided(client):
+    req = FileRulesetGenerationRequest(
+        connection="conn-1",
+        selected_data=[{"locators": [["a"]], "files": ["f1.csv"]}],
+    )
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-file-ruleset/",
+            content=b"yaml",
+            status_code=201,
+        )
+        client.generate_file_ruleset(req)
+
+    assert "locality" not in m.last_request.json()
 
 
 def _schema_discovery_row(row_id: int, column_name: str, table_name: str = "users") -> dict:
