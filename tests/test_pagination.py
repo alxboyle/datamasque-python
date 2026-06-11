@@ -79,6 +79,38 @@ def test_iter_paginated_follows_next_urls(client):
     assert m.call_count == 2
 
 
+def test_iter_paginated_reanchors_absolute_next_link_to_base_url(client):
+    client.token = "Token abc123"
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/items/?limit=2&offset=0",
+            json={
+                "count": 3,
+                "next": "https://wrong-host:8443/api/items/?limit=2&offset=2",
+                "previous": None,
+                "results": [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}],
+            },
+        )
+        m.get(
+            "http://test-server/api/items/?limit=2&offset=2",
+            json={
+                "count": 3,
+                "next": None,
+                "previous": "https://wrong-host:8443/api/items/?limit=2&offset=0",
+                "results": [{"id": 3, "name": "c"}],
+            },
+        )
+
+        items = list(client._iter_paginated("/api/items/", model=Item, page_size=2))
+
+    assert [i.id for i in items] == [1, 2, 3]
+    assert m.call_count == 2
+    second_request = m.request_history[1]
+    assert second_request.netloc == "test-server"
+    assert second_request.scheme == "http"
+    assert second_request.headers["Authorization"] == "Token abc123"
+
+
 def test_iter_paginated_stops_when_next_is_none(client):
     with requests_mock.Mocker() as m:
         m.get(

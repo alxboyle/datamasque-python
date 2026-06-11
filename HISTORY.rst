@@ -2,6 +2,11 @@
 History
 =======
 
+1.0.5 (unreleased)
+------------------
+
+* Fixed a ``401`` when paginating behind a TLS-terminating proxy: ``next`` links are now reduced to path+query and re-anchored to the configured ``base_url`` instead of being followed verbatim, so the ``Authorization`` header is no longer stripped when the server-reported scheme, host, or port differs.
+
 1.0.4 (2026-06-09)
 ------------------
 

@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 from io import BufferedIOBase, BytesIO, TextIOBase
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Type, TypeVar, Union
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import requests
 from pydantic import BaseModel
@@ -82,6 +82,25 @@ def _redact_sensitive(value: Any) -> Any:
         }
 
     return value
+
+
+def _relative_next_url(next_url: Optional[str]) -> Optional[str]:
+    """
+    Reduce a server-reported `next` URL to path+query relative form.
+
+    The server reports `next` as an absolute URL built from its own view of the
+    request, which can disagree with the configured `base_url` in scheme, host,
+    or port (e.g. an `http` link generated behind a TLS-terminating proxy on a
+    non-default port). Following it verbatim makes `requests` treat the hop as
+    cross-origin and strip the `Authorization` header, yielding a 401.
+    Keeping only the path and query re-anchors every page to `base_url`
+    via the `urljoin` in `make_request`.
+    """
+
+    if not next_url:
+        return None
+    split = urlsplit(next_url)
+    return f"{split.path}?{split.query}" if split.query else split.path
 
 
 @contextmanager
@@ -318,7 +337,8 @@ class BaseClient:
         Iterate every `T` across all pages of an admin-server list endpoint.
 
         Opts into pagination by sending `limit`/`offset` on the first request,
-        then follows the absolute `next` URL returned by the server.
+        then follows the `next` URL returned by the server,
+        re-anchored to the configured `base_url`.
         """
 
         first_params = dict(params or {})
@@ -332,8 +352,8 @@ class BaseClient:
             response = self.make_request("GET", url, params=current_params)
             data = response.json()
             yield from (model.model_validate(item) for item in data["results"])
-            url = data.get("next")
-            # The `next` URL is absolute and already contains the pagination cursor;
+            url = _relative_next_url(data.get("next"))
+            # The `next` URL already contains the pagination cursor;
             # do not re-send our initial params alongside it.
             current_params = None
 
